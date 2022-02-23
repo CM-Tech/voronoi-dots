@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Traffic Dots</title>
+    <script src="https://d3js.org/d3.v5.min.js"></script>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+        }
+
+        div.well {
+            position: absolute;
+            padding: 5px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="well">
+        <button class="btn btn-primary" onclick="twhite()" style="left:10px;top:5px;padding:5px">Toggle Theme</button>
+        <input type="range" id="slider" max="200" min="-200" value="-200" step="10" style="margin:0;width:400px">
+    </div>
+    <script>
+        var width = window.innerWidth,
+            height = window.innerHeight;
+
+        var canvas = d3.select("body").append("canvas")
+            .attr("width", width)
+            .attr("height", height),
+            context = canvas.node().getContext("2d");
+
+        var white = 0;
+
+        var nodes = d3.range(width * height / 900).map((i) => ({
+            x: Math.random() * width,
+            y: Math.random() * height
+        }));
+
+        var voronoi = d3.voronoi()
+            .extent([[-1, -1], [width + 1, height + 1]]);
+
+        var charge = d3.forceManyBody().theta(0.8).strength(0);
+        var simulation = d3.forceSimulation(nodes)
+            .alphaDecay(0)
+            .velocityDecay(0.05)
+            .force("charge", charge)
+            .force("collide", d3.forceCollide().radius((d, i) => i == 0 ? 17 : 11).iterations(10))
+            .on("tick", () => {
+                brownian();
+                var diagram = voronoi(nodes.slice(1).map((d) => [d.x, d.y])),
+                    polygons = diagram.polygons();
+                context.clearRect(0, 0, width, height);
+                context.lineWidth = 1;
+                var brightness = 128 + (white ? 100 : -60);
+                context.strokeStyle = "rgb(" + brightness + "," + brightness + "," + brightness + ")";
+                for (var j = 10; j < width + 10; j += 20) {
+                    context.beginPath();
+                    context.moveTo(j + 0.5, 10);
+                    context.lineTo(j + 0.5, Math.round(height / 20) * 20 - 10);
+                    context.stroke();
+                }
+                for (var j = 10; j < height + 10; j += 20) {
+                    context.beginPath();
+                    context.moveTo(10, j + 0.5);
+                    context.lineTo(width - 10, j + 0.5);
+                    context.stroke();
+                }
+              
+                polygons.forEach((cell,i) => {
+                  context.fillStyle = d3.schemeCategory10[(i+white) % 6];
+                  context.lineWidth = 10;
+                  context.beginPath();
+                  context.moveTo(cell[0][0], cell[0][1]);
+                  for (var j = 1, m = cell.length; j < m; ++j) {
+                    context.lineTo(cell[j][0], cell[j][1]);
+                  }
+                  context.closePath();
+                  context.fill();
+                })
+            });
+
+        function brownian() {
+            for (var i = 0; i < nodes.length; i++) {
+                nodes[i].x = Math.max(Math.min(nodes[i].x, width - 10), 10);
+                nodes[i].y = Math.max(Math.min(nodes[i].y, height - 10), 10);
+                // nodes[i].x = nodes[i].x * 0.9 + (Math.round(nodes[i].x / 20 + 0.5) * 20 - 10) * 0.1;
+                // nodes[i].y = nodes[i].y * 0.9 + (Math.round(nodes[i].y / 20 + 0.5) * 20 - 10) * 0.1;
+                if (Math.random() < 0.0015) {
+                    nodes[i].vx = Math.random() < 0.5 ? 5 : -5;
+                }
+                if (Math.random() < 0.0015) {
+                    nodes[i].vy = Math.random() < 0.5 ? 5 : -5;
+                }
+            }
+        }
+        canvas.on("mousemove", () => {
+            var p1 = d3.mouse(canvas.node());
+            nodes[0].fx = p1[0];
+            nodes[0].fy = p1[1];
+        });
+        var charged = false;
+        canvas.on("mousedown", () => {
+            charged = true;
+            charge.strength((_, i) => i == 0 ? slider.value : 0)
+        });
+        canvas.on("mouseup", () => {
+            charged = false;
+            charge.strength(0)
+        });
+        canvas.on("wheel", function () {
+            var delta = -window.event.deltaY;
+            slider.value -= Math.max(-1, Math.min(1, delta)) * 10;
+            if (charged) charge.strength((_, i) => i == 0 ? slider.value : 0);
+        });
+
+        function twhite() { white += 1; }
+    </script>
+</body>
+
+</html>
